@@ -11,6 +11,7 @@ Invoke `/spark-K` inside Claude Code and the agent will:
 3. **Auto-login** as `Admin` using a password stored in macOS Keychain. First run will prompt and save it.
 4. **Verify** `/api/queue` returns 200.
 5. **Declare "method B"** for the session — all subsequent prompt submissions go through the browser's JS context (`cmux browser eval` or Chrome AppleScript) with the browser's own `sessionStorage.clientId`. This makes the tasks visible in ComfyUI's Job Queue panel and results land in Media Assets with thumbnails — you can follow along and intervene.
+6. **Install a progress pump** — injects a WebSocket subscriber into the browser (`window.__sparkK_events`) and starts a persistent Monitor that polls every 2 s and proactively pushes completion / error / saved-image / queue-empty events as chat notifications. No polling from the user — Claude tells you when the job is done.
 
 ## Why this exists
 

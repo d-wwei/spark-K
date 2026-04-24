@@ -11,6 +11,7 @@ description: 一键打开局域网内 ComfyUI 并自动登录 Sentinel。在 cmu
 1. 浏览器 panel（cmux 内置分屏，或系统 Chrome 新 tab）打开 ComfyUI 主界面
 2. Sentinel 已登录（jwt_token cookie 有效）
 3. 本会话后续任何 prompt 提交默认走**方案 B**（浏览器 JS 上下文）
+4. **进度推送持久 Monitor 已启动**——任务完成/报错/图落盘时 Claude 主动通知用户（详见第 8 步）
 
 ## 基线假设
 
@@ -222,9 +223,108 @@ cmux browser --surface "$SURFACE_ID" eval "
 
 3. **LAN IP 访问**：skill 默认 `127.0.0.1`，要走局域网（`172.22.20.115:8188` 之类）就启动参数改一下；Sentinel 同样走 cookie，URL 换域不影响登录流程。
 
+## 第 8 步：启动进度推送（强制执行）
+
+登录成功后，**必须**激活实时进度推送。不做这一步 Claude 就是"盲"的，无法主动告诉用户任务完成/失败。
+
+### 8.1 注入 WebSocket 订阅器
+
+在浏览器里注入一段 JS（幂等——已注入就跳过），它订阅 ComfyUI 的 `/ws`，把收到的事件按类别缓存进 `window.__sparkK_events`：
+
+```bash
+cmux browser --surface "$SURFACE_ID" eval '
+(function(){
+  if (window.__sparkK_installed) return "already installed";
+  window.__sparkK_installed = true;
+  window.__sparkK_events = [];
+  const clientId = sessionStorage.getItem("clientId");
+  const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?clientId=" + clientId;
+  function connect(){
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(ev.data);
+        const t = m.type;
+        // 只保留值得推的事件类型，progress/executing 高频噪音丢弃
+        if (t === "execution_error" || t === "execution_success" || t === "executed" || t === "execution_interrupted" || t === "status") {
+          window.__sparkK_events.push({t: Date.now(), type: t, data: m.data});
+          if (window.__sparkK_events.length > 500) window.__sparkK_events.splice(0, 100);
+        }
+      } catch(e){}
+    };
+    ws.onclose = () => setTimeout(connect, 3000);  // 断线自动重连
+  }
+  connect();
+  return "installed, clientId=" + clientId;
+})()
+'
+```
+
+### 8.2 启动持久 Monitor 推送
+
+**必须**用 Monitor 工具（不是 Bash `run_in_background`）——因为 Monitor 的 stdout 每行 → Claude 通知，正好匹配"事件→推送"语义。
+
+```
+Monitor (persistent=true, description="ComfyUI 任务进度推送"):
+
+while true; do
+  cmux browser --surface <SURFACE_ID> eval '
+    (function(){
+      if (!window.__sparkK_events) return "[]";
+      const drained = window.__sparkK_events.splice(0);
+      return JSON.stringify(drained);
+    })()
+  ' 2>/dev/null | /usr/bin/python3 -c "
+import sys, json
+try:
+    events = json.loads(sys.stdin.read().strip().strip(\"'\\\"\"))
+    if isinstance(events, str): events = json.loads(events)
+except: events = []
+for e in events:
+    t = e.get('type')
+    d = e.get('data') or {}
+    if t == 'execution_error':
+        nid = d.get('node_id','?')
+        msg = (d.get('exception_message') or '')[:200]
+        print(f'❌ ERROR node={nid} prompt={d.get(\"prompt_id\",\"?\")[:8]}: {msg}', flush=True)
+    elif t == 'execution_success':
+        print(f'✅ DONE prompt={d.get(\"prompt_id\",\"?\")[:8]}', flush=True)
+    elif t == 'executed':
+        out = d.get('output') or {}
+        imgs = out.get('images') or []
+        if imgs:
+            names = ','.join(i.get('filename','') for i in imgs)
+            print(f'🖼  SAVED prompt={d.get(\"prompt_id\",\"?\")[:8]} node={d.get(\"node\",\"?\")}: {names}', flush=True)
+    elif t == 'execution_interrupted':
+        print(f'⚠️  INTERRUPTED prompt={d.get(\"prompt_id\",\"?\")[:8]}', flush=True)
+    elif t == 'status':
+        q = (d.get('status') or {}).get('exec_info',{}).get('queue_remaining', -1)
+        if q == 0:
+            print(f'🏁 QUEUE EMPTY', flush=True)
+"
+  sleep 2
+done
+```
+
+**过滤原则**：只 print 值得打扰用户的事件（完成/报错/图落盘/队列空）。progress tick 和 executing node change 全扔——否则 Monitor 噪音太多会被系统自动停掉。
+
+### 8.3 记下 Monitor task id
+
+启动 Monitor 后 Claude 会拿到一个 `task_id`（形如 `b3...`）。skill 结束时告诉用户：
+```
+✅ 进度推送已启动 (Monitor task=<id>)
+   完成/报错时会自动通知你
+```
+
+后续用户说"停止监控"时，Claude 调用 `TaskStop <id>` 关掉。
+
+---
+
 ## 清理（卸载用）
 
 ```bash
 security delete-generic-password -s "spark-K-comfyui" -a "Admin"
 rm -rf ~/.claude/skills/spark-K
 ```
+
+同时在 Claude 里 `TaskStop` 掉 progress Monitor。
