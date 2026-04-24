@@ -13,6 +13,20 @@ Invoke `/spark-K` inside Claude Code and the agent will:
 5. **Declare "method B"** for the session — all subsequent prompt submissions go through the browser's JS context (`cmux browser eval` or Chrome AppleScript) with the browser's own `sessionStorage.clientId`. This makes the tasks visible in ComfyUI's Job Queue panel and results land in Media Assets with thumbnails — you can follow along and intervene.
 6. **Install a progress pump** — injects a WebSocket subscriber into the browser (`window.__sparkK_events`) and starts a persistent Monitor that polls every 2 s and proactively pushes completion / error / saved-image / queue-empty events as chat notifications. No polling from the user — Claude tells you when the job is done.
 
+## Subcommands
+
+Frozen API-format workflow templates in `workflows/` let you trigger stock pipelines with a single command:
+
+```
+/spark-K upscale <image-path>         # UltraSharp 4x + SUPIR (~20 min, best quality)
+/spark-K fast-upscale <image-path>    # UltraSharp 4x only (~1-2 s)
+/spark-K t2i "<prompt>"               # Flux2 text-to-image + SUPIR (~30 min, UNTESTED)
+```
+
+Templates use `{{PLACEHOLDER}}` strings that the skill substitutes at runtime. See `SKILL.md` for each subcommand's full placeholder list (seed, output prefix, size, etc.).
+
+> ⚠️ `t2i` is not yet end-to-end tested — the SUPIR node schema aligns with today's ComfyUI-SUPIR version but runtime behavior hasn't been verified.
+
 ## Why this exists
 
 When Claude submits prompts via plain `curl`, the `client_id` is not the browser's, so the UI sees the jobs but treats them as anonymous API traffic — no Media Assets, no per-node progress bars, no collaboration. Method B closes that gap by running the submission inside the browser where your real session lives.

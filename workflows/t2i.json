@@ -1,0 +1,169 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux2-dev.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "mistral_3_small_flux2_bf16.safetensors",
+      "type": "flux2"
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "{{PROMPT}}",
+      "clip": [
+        "2",
+        0
+      ]
+    }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "{{NEG_PROMPT}}",
+      "clip": [
+        "2",
+        0
+      ]
+    }
+  },
+  "5": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": "{{WIDTH}}",
+      "height": "{{HEIGHT}}",
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": "{{SEED}}",
+      "steps": 25,
+      "cfg": 3.5,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "3",
+        0
+      ],
+      "negative": [
+        "4",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "6",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "UpscaleModelLoader",
+    "inputs": {
+      "model_name": "4x-UltraSharpV2.safetensors"
+    }
+  },
+  "10": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": [
+        "9",
+        0
+      ],
+      "image": [
+        "8",
+        0
+      ]
+    }
+  },
+  "11": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 8.3,
+      "resolution_steps": 1,
+      "image": [
+        "10",
+        0
+      ]
+    }
+  },
+  "12": {
+    "class_type": "SUPIR_Upscale",
+    "inputs": {
+      "supir_model": "SUPIR-v0Q_fp16.safetensors",
+      "sdxl_model": "Juggernaut-XI-byRunDiffusion.safetensors",
+      "seed": "{{SUPIR_SEED}}",
+      "resize_method": "lanczos",
+      "scale_by": 1.0,
+      "steps": 20,
+      "restoration_scale": -1,
+      "cfg_scale": 4.0,
+      "a_prompt": "{{A_PROMPT}}",
+      "n_prompt": "bad quality, blurry, messy, distorted",
+      "s_churn": 5,
+      "s_noise": 1.003,
+      "control_scale": 1.0,
+      "cfg_scale_start": 4.0,
+      "control_scale_start": 0.0,
+      "color_fix_type": "Wavelet",
+      "keep_model_loaded": true,
+      "use_tiled_vae": true,
+      "encoder_tile_size_pixels": 512,
+      "decoder_tile_size_latent": 64,
+      "diffusion_dtype": "auto",
+      "encoder_dtype": "auto",
+      "batch_size": 1,
+      "use_tiled_sampling": true,
+      "sampler_tile_size": 1024,
+      "sampler_tile_stride": 512,
+      "fp8_unet": false,
+      "fp8_vae": false,
+      "sampler": "RestoreEDMSampler",
+      "image": [
+        "11",
+        0
+      ]
+    }
+  },
+  "13": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "{{OUT_PREFIX}}",
+      "images": [
+        "12",
+        0
+      ]
+    }
+  }
+}

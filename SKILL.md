@@ -1,6 +1,7 @@
 ---
 name: spark-K
-description: 一键打开局域网内 ComfyUI 并自动登录 Sentinel。在 cmux 里走内置浏览器分屏；非 cmux 走系统 Chrome。登录完成后声明本会话默认使用"方案 B"——所有 prompt 提交都通过浏览器 JS 上下文（`cmux browser eval` 或 Chrome AppleScript eval）走，使用浏览器的 sessionStorage.clientId，这样提交任务、进度、结果都在 ComfyUI UI 的 Job Queue / Media Assets 里可见可协作。触发：用户输入 `/spark-K`。
+description: 一键打开局域网内 ComfyUI 并自动登录 Sentinel。在 cmux 里走内置浏览器分屏；非 cmux 走系统 Chrome。登录完成后声明本会话默认使用"方案 B"——所有 prompt 提交都通过浏览器 JS 上下文（`cmux browser eval` 或 Chrome AppleScript eval）走，使用浏览器的 sessionStorage.clientId，这样提交任务、进度、结果都在 ComfyUI UI 的 Job Queue / Media Assets 里可见可协作。触发：用户输入 `/spark-K` 或子命令 `/spark-K upscale|fast-upscale|t2i <args>`。
+Subcommands: upscale, fast-upscale, t2i
 ---
 
 # spark-K — ComfyUI 一键协作启动器
@@ -317,6 +318,111 @@ done
 ```
 
 后续用户说"停止监控"时，Claude 调用 `TaskStop <id>` 关掉。
+
+---
+
+## Subcommands（工作流直跑）
+
+### 命令总览
+
+```
+/spark-K                         # 设置（登录 + 注入 WS + 启动推送 Monitor）
+/spark-K upscale <image>         # 工作流 1: UltraSharp 4x → SUPIR 精修 → 4K (20+ min)
+/spark-K fast-upscale <image>    # 工作流 3: 仅 UltraSharp 4x (~1-2s)
+/spark-K t2i "<prompt>"          # 工作流 2: Flux2 文生图 + SUPIR 4K (30+ min, ⚠️未经测试)
+```
+
+### 通用前置
+
+任何 subcommand 执行前：
+1. 确保已完成第 1–8 步（登录 + WS 注入 + 推送 Monitor 运行中）。没有就先跑一次无参 `/spark-K`
+2. 读取对应工作流模板：`~/.claude/skills/spark-K/workflows/<name>.json`
+3. 用 `.replace()` 填占位符
+4. 通过浏览器 `fetch('/prompt')`（方案 B）提交，**必须**带 `client_id: sessionStorage.getItem('clientId')`
+
+### 子命令 1：`upscale <image>`
+
+工作流模板：`workflows/upscale.json`
+
+**占位符**：
+| 占位符 | 默认值 | 说明 |
+|--------|--------|------|
+| `{{IMAGE}}` | 必填 | 图片基名（不含路径）|
+| `{{SEED}}` | `42` | SUPIR 采样种子 |
+| `{{OUT_PREFIX}}` | `upscale_SUPIR` | SaveImage 前缀 |
+| `{{A_PROMPT}}` | `"high quality, detailed, sharp"` | SUPIR 正向提示词 |
+
+**执行流程**：
+
+1. 解析参数：`<image>` 是本地绝对路径，例如 `/Users/moomoo/Downloads/photo.png`
+2. **上传图**（走 Sentinel 路由）：
+   ```bash
+   cmux browser --surface $SURFACE_ID eval "
+   (async function(){
+     const r = await fetch('file://{{ABS_PATH}}');  // 走不通就用下面的 base64 法
+     const blob = await r.blob();
+     const fd = new FormData();
+     fd.append('image', blob, '{{BASENAME}}');
+     fd.append('overwrite', 'true');
+     const u = await fetch('/upload/image', {method:'POST', body: fd, credentials:'include'});
+     return JSON.stringify(await u.json());
+   })()
+   "
+   ```
+   `file://` URL 浏览器 CORS 会拦——备选：`curl -X POST .../upload/image -F image=@<path>` 用 jwt_token cookie 直接上传（需要 jar 同步——见后"凭证桥接"）
+3. 读模板 JSON，`.replace()` 填占位符
+4. 通过 browser.eval 提交 `/prompt`（方案 B 模板，见 SKILL.md 顶部"方案 B 提交模板"）
+5. 推送 Monitor 自动通知完成（`🖼  SAVED prompt=... {{OUT_PREFIX}}_00001_.png`）
+
+### 子命令 2：`fast-upscale <image>`
+
+工作流模板：`workflows/fast-upscale.json`
+
+**占位符**：
+| 占位符 | 默认值 |
+|--------|--------|
+| `{{IMAGE}}` | 必填 |
+| `{{OUT_PREFIX}}` | `fast_upscale` |
+
+**执行流程**：与 `upscale` 完全相同，只是模板更小更快。典型耗时 1-2 秒，出 4x 分辨率。
+
+### 子命令 3：`t2i "<prompt>"`
+
+工作流模板：`workflows/t2i.json`
+
+**占位符**：
+| 占位符 | 默认值 |
+|--------|--------|
+| `{{PROMPT}}` | 必填 |
+| `{{NEG_PROMPT}}` | `"blurry, low quality, distorted, watermark, ugly, deformed"` |
+| `{{WIDTH}}` | `1360` |
+| `{{HEIGHT}}` | `768` |
+| `{{SEED}}` | `42` |
+| `{{SUPIR_SEED}}` | `42` |
+| `{{A_PROMPT}}` | `"high quality, detailed, sharp, photorealistic"` |
+| `{{OUT_PREFIX}}` | `t2i_SUPIR` |
+
+**参数解析**（用户可在 prompt 后附带）：
+- `size=1920x1080` → `WIDTH=1920, HEIGHT=1080`
+- `seed=2026` → `SEED=2026`
+- `no-supir` → fallback 到工作流 3 + 先做 t2i（不在本 subcommand 范围，让用户手动拼）
+
+**⚠️ 未经测试**：t2i 工作流（FLUX2 + SUPIR）在 2026-04-24 的开发过程里**没有端到端实跑过**。节点定义今天验证过与 SUPIR schema 对齐，但运行时行为未知。第一次跑失败（例如某个 Flux2 节点不存在），skill 应退化到错误报告模式并提示用户检查：
+- `/object_info/UNETLoader` 里有无 `flux2-dev.safetensors`
+- `/object_info/CLIPLoader` 里有无 `mistral_3_small_flux2_bf16.safetensors`
+- `/object_info/VAELoader` 里有无 `flux2-vae.safetensors`
+
+### 凭证桥接（curl ↔ 浏览器）
+
+如果需要 curl 上传图（走 multipart 比 browser.eval 的 blob 转换更稳），先从浏览器导出 jwt_token cookie：
+
+```bash
+# 从浏览器拿 cookie（HttpOnly 所以 JS 读不到，要通过 browser surface 的 cookie API）
+cmux browser --surface $SURFACE_ID cookies get 2>&1 | grep jwt_token
+# 或者直接复用 /tmp/comfy_cookies.txt（如果本 session 早先用 curl 登录过）
+```
+
+否则就硬走 browser.eval 的 blob 路径。
 
 ---
 
