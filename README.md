@@ -43,10 +43,26 @@ Then restart Claude Code (or trigger skill discovery). After that `/spark-K` is 
 ## Prerequisites
 
 - macOS (Keychain + AppleScript dependencies)
-- ComfyUI with [ComfyUI-Sentinel](https://github.com/biggPP/ComfyUI-Sentinel) auth middleware
+- ComfyUI with [ComfyUI-Sentinel](https://github.com/biggPP/ComfyUI-Sentinel) auth middleware, started with `--listen 0.0.0.0` so it binds both loopback and LAN interfaces
 - Either:
   - cmux (for built-in browser pane), or
   - Chrome with "View → Developer → Allow JavaScript from Apple Events" enabled (for `chrome-control` fallback)
+
+## Server host
+
+The skill is configured by default to reach ComfyUI at `172.22.20.115:8188` — the LAN IP of the machine that runs ComfyUI. Colleagues installing this skill on their own Mac reach the shared server by that LAN address.
+
+If the server moves or you want to point at a different host, override via environment variable:
+
+```bash
+export COMFY_HOST=172.22.20.200:8188   # different server
+# or for single-machine use:
+export COMFY_HOST=127.0.0.1:8188
+```
+
+`COMFY_HOST` is honored by `scripts/check-setup.sh` and `scripts/upload-image.sh`. For the URL hardcoded in `SKILL.md` / `references/setup.md` / `references/subcommand-t2i.md`, change the value there if the LAN IP is permanent (and send a PR); otherwise set `COMFY_HOST` and ask Claude to prefer it.
+
+Everyone who connects needs the Sentinel admin password stored in their own Keychain on first run — you are not distributing credentials via this repo.
 
 ## Configuration
 

@@ -5,7 +5,7 @@
 set -u
 
 SURFACE_ID="${1:-}"
-HOST="${COMFY_HOST:-127.0.0.1:8188}"
+HOST="${COMFY_HOST:-172.22.20.115:8188}"
 
 if [[ -z "$SURFACE_ID" ]]; then
   echo "check-setup: SURFACE_ID required (cmux surface ref, or 'chrome')" >&2

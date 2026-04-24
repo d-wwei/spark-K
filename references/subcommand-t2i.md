@@ -43,9 +43,9 @@ bash scripts/check-setup.sh "$SURFACE_ID" || exit 1
 If this is the first run on a fresh ComfyUI install, verify these are present via `/object_info`:
 
 ```bash
-/usr/bin/curl -s "http://127.0.0.1:8188/object_info/UNETLoader" | grep -q "flux2-dev.safetensors" || echo "missing UNET"
-/usr/bin/curl -s "http://127.0.0.1:8188/object_info/CLIPLoader" | grep -q "mistral_3_small_flux2_bf16" || echo "missing CLIP"
-/usr/bin/curl -s "http://127.0.0.1:8188/object_info/VAELoader" | grep -q "flux2-vae" || echo "missing VAE"
+/usr/bin/curl -s "http://172.22.20.115:8188/object_info/UNETLoader" | grep -q "flux2-dev.safetensors" || echo "missing UNET"
+/usr/bin/curl -s "http://172.22.20.115:8188/object_info/CLIPLoader" | grep -q "mistral_3_small_flux2_bf16" || echo "missing CLIP"
+/usr/bin/curl -s "http://172.22.20.115:8188/object_info/VAELoader" | grep -q "flux2-vae" || echo "missing VAE"
 ```
 
 If any print, the template will fail at `/prompt` validation. Report the missing model to the user.

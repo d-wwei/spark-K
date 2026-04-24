@@ -2,12 +2,12 @@
 # upload-image.sh — correct-by-construction image upload to ComfyUI via /upload/image.
 # Routes the file through Sentinel's per-user path resolution (which direct `cp` does NOT).
 # Usage: upload-image.sh <local-path> [SURFACE_ID]
-# Env: COMFY_HOST (default 127.0.0.1:8188), COMFY_COOKIE_JAR (default /tmp/spark-K-cookies.txt)
+# Env: COMFY_HOST (default 172.22.20.115:8188), COMFY_COOKIE_JAR (default /tmp/spark-K-cookies.txt)
 set -u
 
 LOCAL="${1:-}"
 SURFACE_ID="${2:-}"
-HOST="${COMFY_HOST:-127.0.0.1:8188}"
+HOST="${COMFY_HOST:-172.22.20.115:8188}"
 JAR="${COMFY_COOKIE_JAR:-/tmp/spark-K-cookies.txt}"
 
 if [[ -z "$LOCAL" || ! -f "$LOCAL" ]]; then

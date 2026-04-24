@@ -26,7 +26,7 @@ These are mechanically checkable. Violations in skill output or transcripts MUST
 
 User-observable pass/fail for a successful skill run:
 
-1. **Browser pane exists and shows ComfyUI main UI at `http://127.0.0.1:8188/`** (not login page). The user sees their workflow graph, not a form.
+1. **Browser pane exists and shows ComfyUI main UI at `http://172.22.20.115:8188/`** (not login page). The user sees their workflow graph, not a form.
 2. **`/api/queue` from the browser returns HTTP 200 with JSON body `{queue_running, queue_pending}`**. The agent prints the raw response as evidence.
 3. **`window.__sparkK_installed === true` in the browser context** AND a persistent Monitor task ID is reported back to the user. Without both, progress push is not actually armed.
 4. **Every subsequent subcommand run emits at least one `🖼  SAVED` / `❌ ERROR` / `🏁 QUEUE EMPTY` push notification** per task lifecycle. Silent completion is a regression.
@@ -45,7 +45,7 @@ Every subcommand MUST first run the setup + progress pump if not already done.
 ## Scope & Prerequisites
 
 - macOS (Darwin). Non-Darwin execution is out of scope; skill will refuse with a clear message.
-- ComfyUI with [ComfyUI-Sentinel](https://github.com/biggPP/ComfyUI-Sentinel) auth middleware, running at `127.0.0.1:8188`.
+- ComfyUI with [ComfyUI-Sentinel](https://github.com/biggPP/ComfyUI-Sentinel) auth middleware, running at `172.22.20.115:8188`.
 - Either cmux (browser-pane host with `browser eval` / `browser cookies set` / `new-split --type browser`) or Google Chrome with "Allow JavaScript from Apple Events" enabled. Detection: `$CMUX_WORKSPACE_ID` set and `cmux` on PATH → cmux; otherwise Chrome.
 
 ## References Table

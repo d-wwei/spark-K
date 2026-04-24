@@ -5,7 +5,7 @@ Bring the skill from cold start to "ready for submissions." Load this reference 
 ## Step 1 — Reachability probe
 
 ```bash
-/usr/bin/curl -s -m 3 -o /dev/null -w "%{http_code}" http://127.0.0.1:8188/login
+/usr/bin/curl -s -m 3 -o /dev/null -w "%{http_code}" http://172.22.20.115:8188/login
 ```
 
 If not `200`, stop. Tell the user ComfyUI is not running. Do not proceed.
@@ -42,15 +42,15 @@ fi
 Look for an existing ComfyUI surface first:
 
 ```bash
-SURFACE_ID=$(cmux tree --all 2>&1 | grep -E "browser.*127\.0\.0\.1:8188" | grep -oE "surface:[0-9]+" | tail -1)
+SURFACE_ID=$(cmux tree --all 2>&1 | grep -E "browser.*(172\.22\.20\.115|127\.0\.0\.1):8188" | grep -oE "surface:[0-9]+" | tail -1)
 ```
 
 If empty, create one:
 
 ```bash
-cmux new-split right --type browser --url "http://127.0.0.1:8188/login"
+cmux new-split right --type browser --url "http://172.22.20.115:8188/login"
 sleep 2
-SURFACE_ID=$(cmux tree --all 2>&1 | grep -E "browser.*127\.0\.0\.1:8188" | grep -oE "surface:[0-9]+" | tail -1)
+SURFACE_ID=$(cmux tree --all 2>&1 | grep -E "browser.*(172\.22\.20\.115|127\.0\.0\.1):8188" | grep -oE "surface:[0-9]+" | tail -1)
 ```
 
 ### chrome branch
@@ -58,7 +58,7 @@ SURFACE_ID=$(cmux tree --all 2>&1 | grep -E "browser.*127\.0\.0\.1:8188" | grep 
 Run the `chrome-control` skill's preflight first. Then:
 
 ```bash
-osascript -e 'tell application "Google Chrome" to tell front window to make new tab with properties {URL:"http://127.0.0.1:8188/login"}'
+osascript -e 'tell application "Google Chrome" to tell front window to make new tab with properties {URL:"http://172.22.20.115:8188/login"}'
 osascript -e 'tell application "Google Chrome" to activate'
 sleep 2
 ```
